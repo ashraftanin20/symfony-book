@@ -8,6 +8,8 @@ use App\Form\CommentType;
 use App\Repository\CommentRepository;
 use App\Repository\ConferenceRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use App\SpamChecker;
+use SpamChecker as GlobalSpamChecker;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Request;
@@ -31,7 +33,7 @@ class ConferenceController extends AbstractController
     #[Route('/conference/{slug}', name: 'conference')]
     public function show(Request $request, Conference $conference,
                              CommentRepository $commentRepository, 
-                             ConferenceRepository $conferenceRepository,
+                             SpamChecker $spamChecker,
                              #[Autowire('%photo_dir%')] string $photoDir): Response {
        
        $comment = new Comment();
@@ -46,6 +48,17 @@ class ConferenceController extends AbstractController
                 $comment->setPhotoFilename($filename);
             }
             $this->entityManager->persist($comment);
+
+            $context = [
+                'user_ip' => $request->getClientIp(),
+                'user_agent' => $request->headers->get('user-agent'),
+                'referrer' => $request->headers->get('referer'),
+                'permalink' => $request->getUri(),
+            ];
+
+            if(2 === $spamChecker->getSpamScore($comment, $context)) {
+                throw new \RuntimeException('Blatant spam, go away!');
+            }
             $this->entityManager->flush();
 
             return $this->redirectToRoute('conference', ['slug' => $conference->getSlug()]);
@@ -55,7 +68,7 @@ class ConferenceController extends AbstractController
 
         //return new Response($twig->render('conference/show.html.twig', [
         return $this->render('conference/show.html.twig', [
-            'conferences' => $conferenceRepository->findAll(),
+            //'conferences' => $conference,
             'conference' => $conference,
             'comments' => $paginator,
             'previous' => $offset - CommentRepository::PASINATOR_PER_PAGE,
