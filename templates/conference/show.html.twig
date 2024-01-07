@@ -27,6 +27,10 @@
         <div>No comments have been posted yet for this conference.</div>
     {% endif %}
 
+    <h2>Add you own feedback</h2>
+
+    {{ form(comment_form) }}
+
     <br><br>
     <a href="{{ path('homepage') }}">Back To Conferences</a>
 {% endblock %}
